@@ -1,0 +1,29 @@
+---
+title: "Homework6"
+author: "Cassandra Wang"
+date: "10/22/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# The **plot()** function to create a plot 
+
+The input for the function is the name of a protein to be plotted, and the output of the function is the plot. 
+```{r}
+plot <- function(x) {
+  s <- read.pdb(x)
+  s.chainA <- trim.pdb(s, chain="A", elety="CA")
+  s.b <- s.chainA$atom$b
+  plotb3(s.b, sse=s.chainA, typ="l", ylab="Bfactor")
+}
+```
+
+Here are the plots for the three proteins from Class 6: 
+```{r}
+plot("4AKE")
+plot("1AKE")
+plot("1E4Y")
+```
