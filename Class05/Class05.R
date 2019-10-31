@@ -1,3 +1,9 @@
+#' ---
+#' title: "Class05: Data exploration and visualization in R"
+#' author: "Cassandra Wang"
+#' output: github_document
+#' ---
+
 # Class5 Data Visualization
 x <- rnorm(1000)
 
