@@ -2,7 +2,7 @@
 title: "Class07"
 author: "Cassandra Wang"
 date: "10/22/2019"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
@@ -23,10 +23,6 @@ rescale(1:10)
 
 ```{r}
 rescale( c(1, 10, 5, NA, 6))
-```
-
-```{r}
-rescale2( c(1:10, "name"))
 ```
 
 ## A new function called both_na()
@@ -108,9 +104,6 @@ both_na2 <- function(x,y) {
 }
 ```
 
-```{r}
-both_na2(x,y3)
-```
 
 ## Writing a new function grade():
 
