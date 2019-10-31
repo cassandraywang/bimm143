@@ -1,0 +1,229 @@
+---
+title: "Class08"
+author: "Cassandra Wang"
+date: "10/24/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## K-means clustering
+```{r}
+# Generate some sample data for clustering
+tmp <- c(rnorm(30,-3), rnorm(30,3))
+x <- cbind(x=tmp, y=rev(tmp))
+
+plot(x)
+```
+
+Use the kmeans() function setting k to 2 and nstart=20
+```{r}
+k <- kmeans(x, centers=2, nstart=20)
+```
+
+```{r}
+k
+```
+
+For cluster size:
+```{r}
+k$size 
+```
+
+For cluster membership/assignment:
+```{r}
+k$cluster
+```
+
+For cluster center:
+```{r}
+k$centers
+```
+
+Plot x colored by the kmeans cluster assignment and add cluster centers as blue points
+```{r}
+plot(x, col=k$cluster)
+points(k$centers, col="blue", pch=15)
+```
+
+## Hierarchical clustering
+The `hclust()` function requires a distance matrix as an input. You can get this from the `dist()` function. 
+
+```{r}
+# First we need to calculate point (dis)similarity as the Euclidean distance between observations
+dist_matrix <- dist(x)
+
+# The hclust() function returns a hierarchical clustering model
+hc <- hclust(d = dist_matrix)
+
+# The print method is not so useful here
+hc
+```
+
+```{r}
+# Draw a dendrogram
+plot(hc)
+abline(h=6, col="red")
+grps <- cutree(hc, h=6)
+```
+
+```{r}
+cutree(hc, k=4)
+```
+
+```{r}
+# Step 1. Generate some example data for clustering
+x2 <- rbind(
+ matrix(rnorm(100, mean=0, sd = 0.3), ncol = 2), # c1
+ matrix(rnorm(100, mean = 1, sd = 0.3), ncol = 2), # c2
+ matrix(c(rnorm(50, mean = 1, sd = 0.3), # c3
+ rnorm(50, mean = 0, sd = 0.3)), ncol = 2))
+colnames(x2) <- c("x", "y")
+
+# Step 2. Plot the data without clustering
+plot(x2)
+
+# Step 3. Generate colors for known clusters (just so we can compare to hclust results)
+col <- as.factor( rep(c("c1","c2","c3"), each=50) )
+plot(x2, col=col)
+```
+
+```{r}
+# clustering 
+hc2 <- hclust(dist(x2))
+
+# draw tree
+plot(hc2)
+abline(h=2, col="red")
+
+# cut the tree into clusters/groups 
+grps2 <- cutree(hc2, k=3)
+grps2
+```
+
+Plot the data colored by their hclust result with k=3. 
+```{r}
+plot(x2, col=grps2)
+```
+
+How many points in each cluster?
+```{r}
+table(grps2)
+```
+
+Cross-tabulate (i.e. compare our clustering result with the known answer)
+```{r}
+table(grps2, col)
+```
+
+## Principal Component Analysis (PCA)
+
+Read some example gene expression data: 
+```{r}
+mydata <- read.csv("https://tinyurl.com/expression-CSV",
+ row.names=1)
+
+head(mydata)
+```
+
+How many genes are is this dataset?
+```{r}
+dim(mydata)
+nrow(mydata)
+```
+
+Let's do pca with the pr(comp) function.
+```{r}
+pca <- prcomp(t(mydata), scale=TRUE)
+
+## See what is returned by the prcomp() function
+attributes(pca)
+
+# $names
+#[1] "sdev" "rotation" "center" "scale" "x"
+#
+# $class
+#[1] "prcomp"
+
+## A basic PC1 vs PC2 2-D plot
+plot(pca$x[,1], pca$x[,2])
+
+## Variance captured per PC
+pca.var <- pca$sdev^2 
+
+## Precent variance is often more informative to look at
+pca.var <- pca$sdev^2
+pca.var.per <- round(pca.var/sum(pca.var)*100, 1)
+
+pca.var.per
+
+barplot(pca.var.per, main="Scree Plot",
+ xlab="Principal Component", ylab="Percent Variation")
+
+## A vector of colors for wt and ko samples
+colvec <- colnames(mydata)
+colvec[grep("wt", colvec)] <- "red"
+colvec[grep("ko", colvec)] <- "blue"
+plot(pca$x[,1], pca$x[,2], col=colvec, pch=16,
+ xlab=paste0("PC1 (", pca.var.per[1], "%)"),
+ ylab=paste0("PC2 (", pca.var.per[2], "%)")) 
+```
+
+## PCA of UK Food Data
+```{r}
+x <- read.csv("UK_foods.csv")
+dim(x)
+```
+
+Preview first and last 6 rows of the dataset. 
+```{r}
+head(x)
+tail(x)
+```
+
+```{r}
+rownames(x) <- x[,1]
+x <- x[,-1]
+head(x)
+```
+
+```{r}
+dim(x)
+```
+
+```{r}
+x <- read.csv("UK_foods.csv", row.names=1)
+head(x)
+```
+
+Generating barplots and pairwise plots
+```{r}
+barplot(as.matrix(x), beside=T, col=rainbow(nrow(x)))
+```
+
+```{r}
+barplot(as.matrix(x), beside=F, col=rainbow(nrow(x)))
+```
+
+```{r}
+pairs(x, col=rainbow(10), pch=16)
+```
+
+# Use the prcomp() PCA function 
+```{r}
+pca <- prcomp( t(x) )
+summary(pca)
+```
+
+```{r}
+# Plot PC1 vs PC2
+plot(pca$x[,1], pca$x[,2], xlab="PC1", ylab="PC2", xlim=c(-270,500))
+text(pca$x[,1], pca$x[,2], colnames(x))
+```
+
+```{r}
+plot(pca$x[,1], pca$x[,2])
+```
+
