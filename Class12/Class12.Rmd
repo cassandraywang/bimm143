@@ -30,7 +30,18 @@ write.pdb(protein, file="1hsg_protein.pdb")
 write.pdb(ligand, file="1hsg_ligand.pdb")
 ```
 
-```{r}
+## Inspecting docking results
 
+Processing all.pdbqt file to a PDB format file that can be loaded into VMD
+```{r}
+library(bio3d)
+res <- read.pdb("all.pdbqt", multi=TRUE)
+write.pdb(res, "results.pdb")
 ```
 
+Quantitatively inspecting the docks
+```{r}
+# res <- read.pdb("all.pdbqt", multi=TRUE)
+ori <- read.pdb("ligand.pdbqt")
+rmsd(ori, res)
+```
