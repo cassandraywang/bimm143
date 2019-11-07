@@ -1,0 +1,36 @@
+---
+title: "Class12: Structural Bioinformatics II"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Prep for docking 
+
+Load the Bio3D package and download the "1hsg" PDB entry
+```{r}
+library(bio3d)
+file.name <- get.pdb("1hsg")
+```
+
+Read the PDB file into R for further analysis 
+```{r}
+hiv <- read.pdb(file.name)
+hiv
+```
+
+Extract the protein-only and ligand-only objects
+```{r}
+protein <- atom.select(hiv, "protein", value=TRUE)
+ligand <- atom.select(hiv, "ligand", value=TRUE)
+
+write.pdb(protein, file="1hsg_protein.pdb")
+write.pdb(ligand, file="1hsg_ligand.pdb")
+```
+
+```{r}
+
+```
+
