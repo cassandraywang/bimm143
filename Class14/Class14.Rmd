@@ -1,0 +1,206 @@
+---
+title: "Class 14: Transcriptomics and RNA-Seq data analysis"
+output: github_document
+---
+
+## DESeq2 setup
+
+We will use the DESeq2 pacage from Bioconductor. To install, run **in the CONSOLE.**
+
+```{r}
+#install.packages("BiocManager")
+#BiocManager::install()
+#BiocManager::install("DESeq2")
+```
+
+## Input dataset
+
+```{r}
+counts <- read.csv("data/airway_scaledcounts.csv", stringsAsFactors = FALSE)
+metadata <-  read.csv("data/airway_metadata.csv", stringsAsFactors = FALSE)
+```
+
+```{r}
+head(counts)
+head(metadata)
+```
+
+How many genes do we have in this dataset?
+```{r}
+nrow(counts)
+```
+
+How many exps do we have?
+```{r}
+ncol(counts)
+nrow(metadata)
+```
+
+We want to know if there is a difference in expression values for control (non-drug) vs treated (i.e. drug added cell lines). 
+
+First step is to find which experiments were the control experiments and then get the average values across all control experiments. Then we will do the same for drug treated. 
+
+Analyze metadata to determine which were control and which were drug-treated: 
+```{r}
+View(metadata)
+```
+
+Average expression value for control experiments:
+```{r}
+control <- metadata[metadata[,"dex"]=="control",]
+control.mean <- rowSums( counts[ ,control$id] )/ length(control$id)
+names(control.mean) <- counts$ensgene
+```
+
+Average expression value for drug treated experiments:
+```{r}
+treated <- metadata[metadata[,"dex"]=="treated",]
+treated.mean <- rowSums( counts[ ,treated$id] )/ length(treated$id)
+names(treated.mean) <- counts$ensgene
+```
+
+Sum of the mean counts across all genes for each group:
+```{r}
+meancounts <- data.frame(control.mean, treated.mean)
+colSums(meancounts)
+```
+
+Scatter plot showing the mean of the treated samples against the mean of the control samples
+```{r}
+plot(meancounts$control.mean, meancounts$treated.mean, xlab="Control", ylab="Treated")
+```
+
+Plotting both axes on a log scale 
+```{r}
+plot(meancounts$control.mean, meancounts$treated.mean, log="xy", xlab="log Control", ylab="log Treated")
+```
+
+We can find candidate differentially expressed genes by looking for genes with a large change between control and dex-treated samples. We usually look at the log2 of the fold change, because this has better mathematical properties.
+
+Here we calculate log2foldchange, add it to our meancounts data.frame and inspect the results either with the head() or the View() function for example.
+
+```{r}
+meancounts$log2fc <- log2(meancounts[,"treated.mean"]/meancounts[,"control.mean"])
+head(meancounts)
+```
+
+We need to remove the genes with zero expression.
+
+```{r}
+zero.vals <- which(meancounts[,1:2]==0, arr.ind=TRUE)
+
+to.rm <- unique(zero.vals[,1])
+mycounts <- meancounts[-to.rm,]
+head(mycounts)
+```
+
+A common threshold used for calling something differentially expressed is a log2(FoldChange) of greater than 2 or less than -2. We need to filter the dataset both ways to see how many genes are up or down-regulated.
+
+```{r}
+up.ind <- mycounts$log2fc > 2
+down.ind <- mycounts$log2fc < (-2)
+
+sum(up.ind)
+sum(down.ind)
+```
+
+## DESeq2 analysis
+
+```{r}
+library(DESeq2)
+```
+
+```{r}
+dds <- DESeqDataSetFromMatrix(countData=counts, 
+                              colData=metadata, 
+                              design=~dex, 
+                              tidy=TRUE)
+dds
+```
+
+Run DESeq2:
+```{r}
+dds <- DESeq(dds)
+```
+
+Get the results: 
+```{r}
+res <- results(dds)
+res
+```
+
+```{r}
+summary(res)
+```
+
+Reorder our results table by the smallest p value:
+```{r}
+resOrdered <- res[order(res$pvalue),]
+
+res05 <- results(dds, alpha=0.05)
+summary(res05)
+```
+
+```{r}
+resSig05 <- subset(as.data.frame(res), padj < 0.05)
+nrow(resSig05)
+```
+
+## Making a summary (aka volcano) plot
+
+This figure will combine both Fold change and the p-value into one overview figure indicating the proportion of genes with large scale significant differences in their expression. 
+
+```{r}
+res$sig <- res$padj<0.05 & abs(res$log2FoldChange)>2
+
+table(res$sig)
+```
+
+```{r}
+sum(is.na(res$sig))
+```
+
+```{r}
+# Set the color palette for our plot
+palette( c("gray","blue") )
+
+plot( res$log2FoldChange,  -log(res$padj), 
+ col=res$sig+1, ylab="-Log(P-value)", xlab="Log2(FoldChange)")
+
+# Add some cut-off lines
+abline(v=c(-2,2), col="darkgray", lty=2)
+abline(h=-log(0.1), col="darkgray", lty=2)
+```
+
+```{r}
+palette("default") 
+
+# Setup our custom point color vector 
+mycols <- rep("gray", nrow(res))
+mycols[ abs(res$log2FoldChange) > 2 ]  <- "red" 
+
+inds <- (res$padj < 0.01) & (abs(res$log2FoldChange) > 2 )
+mycols[ inds ] <- "blue"
+
+#Volcano plot with custom colors 
+plot( res$log2FoldChange,  -log(res$padj), 
+ col=mycols, ylab="-Log(P-value)", xlab="Log2(FoldChange)" )
+
+abline(v=c(-2,2), col="gray", lty=2)
+abline(h=-log(0.1), col="gray", lty=2)
+```
+
+```{r}
+library(ggplot2)
+
+ggplot(as.data.frame(res), aes(log2FoldChange, -log10(pvalue), col=sig)) + 
+    geom_point() + 
+    ggtitle("Volcano plot")
+```
+
+Save our results for next class:
+
+```{r}
+write.csv(res, file="expression_results.csv")
+```
+
