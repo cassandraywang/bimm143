@@ -1,0 +1,237 @@
+---
+title: "Class 15: Pathway Analysis from RNA-Seq Results"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Differential Expression Analysis
+
+```{r}
+library(DESeq2)
+```
+
+Import count and metadata 
+
+```{r}
+metaFile <- "GSE37704_metadata.csv"
+countFile <- "GSE37704_featurecounts.csv"
+```
+
+Take a look at our data
+
+```{r}
+colData = read.csv(metaFile, row.names=1)
+head(colData)
+
+countData = read.csv(countFile, row.names=1)
+head(countData)
+```
+
+The **length** column in count data will cause problems, so we need to remove the first column.
+```{r}
+countData <- as.matrix(countData[,-1])
+head(countData)
+```
+
+Double check that the colnames in countData match the id values in the metadata 
+```{r}
+colnames(countData)
+rownames(colData)
+
+# Use all() function to check if all entries in a vector are the same
+all (colnames(countData) == rownames(colData))
+```
+
+Remove genes that have 0 count values in all experiments (i.e. rows that have 0 across all columns)
+```{r}
+countData = countData[rowSums(countData) != 0, ]
+head(countData)
+```
+
+Running DESeq2
+
+```{r}
+dds = DESeqDataSetFromMatrix(countData=countData,
+                             colData=colData,
+                             design=~condition)
+dds = DESeq(dds)
+```
+
+```{r}
+dds
+```
+
+Get our results
+
+```{r}
+res = results(dds)
+res
+```
+
+Make a volcano plot
+
+```{r}
+plot( res$log2FoldChange, -log(res$padj) )
+```
+
+Add some color
+```{r}
+mycols <- rep("gray", length(res$padj))
+mycols[ abs(res$log2FoldChange) > 2] <- "blue"
+mycols[ res$padj > 0.005] <- "gray"
+plot( res$log2FoldChange, -log(res$padj) )
+```
+
+Adding gene annotation
+
+```{r}
+library("AnnotationDbi")
+library("org.Hs.eg.db")
+
+# We can translate between all the following database ID systems
+columns(org.Hs.eg.db)
+```
+
+```{r}
+res$symbol = mapIds(org.Hs.eg.db,
+                    keys=row.names(countData), # where are my IDs
+                    keytype="ENSEMBL",         # what format are my IDs
+                    column="SYMBOL",           # the new format I want
+                    multiVals="first")
+res
+```
+
+```{r}
+res$entrez = mapIds(org.Hs.eg.db,
+                    keys=row.names(countData),
+                    keytype="ENSEMBL",
+                    column="ENTREZID",
+                    multiVals="first")
+res
+```
+
+```{r}
+res$name =   mapIds(org.Hs.eg.db,
+                    keys=row.names(res),
+                    keytype="ENSEMBL",
+                    column="GENENAME",
+                    multiVals="first")
+
+head(res, 10)
+```
+
+```{r}
+res = res[order(res$pvalue),]
+write.csv(res, file="deseq_results.csv")
+```
+
+## Pathway Analysis
+
+Here we are going to use the gage package for pathway analysis. Once we have a list of enriched pathways, we're going to use the pathview package to draw pathway diagrams, shading the molecules in the pathway by their degree of up/down-regulation.
+
+```{r}
+library(pathview)
+library(gage)
+library(gageData)
+```
+
+```{r}
+data(kegg.sets.hs)
+data(sigmet.idx.hs)
+
+# Focus on signaling and metabolic pathways only
+kegg.sets.hs = kegg.sets.hs[sigmet.idx.hs]
+
+# Examine the first 3 pathways
+head(kegg.sets.hs, 3)
+```
+
+```{r}
+foldchanges = res$log2FoldChange
+names(foldchanges) = res$entrez
+head(foldchanges)
+```
+
+Run the gage pathway analysis to get our results
+
+```{r}
+keggres = gage(foldchanges, gsets=kegg.sets.hs)
+```
+
+Now let's look at the object returned from gage().
+
+```{r}
+attributes(keggres)
+```
+
+```{r}
+head(keggres$less)
+```
+
+Make a pathway plot
+
+```{r}
+pathview(gene.data=foldchanges, pathway.id="hsa04110")
+
+# A different PDF based output of the same data
+pathview(gene.data=foldchanges, pathway.id="hsa04110", kegg.native=FALSE)
+```
+
+Focus on top 5 upregulated pathways
+
+```{r}
+keggrespathways_up <- rownames(keggres$greater)[1:5]
+
+# Extract the 8 character long IDs part of each string
+keggresids_up = substr(keggrespathways_up, start=1, stop=8)
+keggresids_up
+```
+
+Finally, lets pass these IDs in keggresids to the pathview() function to draw plots for all the top 5 upregulated pathways.
+
+```{r}
+pathview(gene.data=foldchanges, pathway.id=keggresids_up, species="hsa")
+```
+
+Focus on top 5 downregulated pathways
+
+```{r}
+keggrespathways_down <- rownames(keggres$less)[1:5]
+
+# Extract the 8 character long IDs part of each string
+keggresids_down = substr(keggrespathways_down, start=1, stop=8)
+keggresids_down
+
+pathview(gene.data=foldchanges, pathway.id=keggresids_down, species="hsa")
+```
+
+## Gene Ontology
+
+```{r}
+data(go.sets.hs)
+data(go.subs.hs)
+
+# Focus on Biological Process subset of GO
+gobpsets = go.sets.hs[go.subs.hs$BP]
+
+gobpres = gage(foldchanges, gsets=gobpsets, same.dir=TRUE)
+
+lapply(gobpres, head)
+```
+
+## Reactome Analysis
+
+Output the list of significant genes at the 0.05 level as a plain text file
+
+```{r}
+sig_genes <- res[res$padj <= 0.05 & !is.na(res$padj), "symbol"]
+print(paste("Total number of significant genes:", length(sig_genes)))
+```
+
+```{r}
+write.table(sig_genes, file="significant_genes.txt", row.names=FALSE, col.names=FALSE, quote=FALSE)
+```
+
