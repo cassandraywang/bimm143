@@ -1,0 +1,282 @@
+---
+title: "Class17: Biological Network Analysis"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Set up Cytoscape and R connection
+
+We will use the **igraph** package from CRAN and the **RCy3** package from bioconductor to build and visualize networks of this data.
+
+```{r}
+library(RCy3)
+library(igraph)
+library(RColorBrewer)
+```
+
+```{r}
+library(RCy3)
+
+# Test the connection to Cytoscape.
+cytoscapePing()
+
+# Check the version
+cytoscapeVersionInfo()
+```
+
+Make a small network and send it to Cytoscape
+```{r}
+g <- makeSimpleIgraph()
+createNetworkFromIgraph(g,"myGraph")
+```
+
+Include the Cytoscape rendered network image in our report 
+```{r}
+fig <- exportImage(filename="demo", type="png", height=350)
+```
+
+```{r}
+knitr::include_graphics("./demo.png")
+```
+
+Swtich styles
+```{r}
+setVisualStyle("Marquee")
+```
+
+```{r}
+fig <- exportImage(filename="demo_marquee", type="png", height=350)
+
+knitr::include_graphics("./demo_marquee.png")
+```
+
+See what other styles are available
+```{r}
+styles <- getVisualStyleNames()
+styles
+```
+
+Try another style
+```{r}
+setVisualStyle("Ripple")
+
+fig <- exportImage(filename="demo_ripple", type="png", height=350)
+
+knitr::include_graphics("./demo_ripple.png")
+```
+
+```{r}
+plot(g)
+```
+
+## Read our metagenomics data
+
+```{r}
+prok_vir_cor <- read.delim("virus_prok_cor_abundant.tsv", stringsAsFactors = FALSE)
+
+## Have a peak at the first 6 rows
+head(prok_vir_cor)
+```
+
+Use the igraph package to convert the co-occurrence dataframe into a network that we can send to Cytoscape. In this case our graph is undirected (so we will set directed = FALSE) since we do not have any information about the direction of the interactions from this type of data.
+```{r}
+g <- graph.data.frame(prok_vir_cor, directed = FALSE)
+```
+
+We can check the class of our new object g and see that is is of class igraph. Therefor the print.igraph() function will be called when we type it’s name allowing us have an informative overview of the graph structure.
+```{r}
+class(g)
+```
+
+```{r}
+g
+```
+
+```{r}
+plot(g)
+```
+
+Turn off the text labels
+```{r}
+plot(g, vertex.label=NA)
+```
+
+Make the nodes/vertex smaller
+```{r}
+plot(g, vertex.size=3, vertex.label=NA)
+```
+
+## Use ggplot instead
+
+```{r}
+library(ggraph)
+```
+
+```{r}
+ggraph(g, layout = 'auto') +
+  geom_edge_link(alpha = 0.25) +
+  geom_node_point(color="steelblue") +
+  theme_graph()
+```
+
+Send this network to Cytoscape
+```{r}
+createNetworkFromIgraph(g,"myIgraph")
+```
+
+## Network community detection
+
+Community structure detection algorithms try to find dense sub-graphs within larger network graphs (i.e. clusters of well connected nodes that are densely connected themselves but sparsely connected to other nodes outside the cluster) . Here we use the classic Girvan & Newman betweenness clustering method. The igraph package has lots of different community detection algorithms (i.e. different methods for finding communities).
+
+```{r}
+cb <- cluster_edge_betweenness(g)
+```
+
+```{r}
+cb
+```
+
+```{r}
+plot(cb, y=g, vertex.label=NA,  vertex.size=3)
+```
+
+Extract a cluster/community membership vector for further inspection with the membership() function
+```{r}
+head( membership(cb) )
+```
+
+## Node Degree
+
+The degree of a node or vertex is its most basic structural property, the number of its adjacent edges. Here we calculate and plot the node degree distribution.
+
+```{r}
+d <- degree(g)
+hist(d, breaks=30, col="lightblue", main ="Node Degree Distribution")
+```
+
+For the degree_distribution() function a numeric vector of the same length as the maximum degree plus one is returned. The first element is the relative frequency zero degree vertices, the second vertices with degree one, etc.
+```{r}
+plot( degree_distribution(g), type="h" )
+```
+
+## Centrality Analysis
+
+Centrality gives an estimation on how important a node or edge is for the connectivity (or the information flow) of a network. It is a particularly useful parameter in signaling networks and it is often used when trying to find drug targets for example.
+
+Centrality analysis often aims to answer the following question: Which nodes are the most important and why?
+
+```{r}
+pr <- page_rank(g)
+head(pr$vector)
+```
+
+```{r}
+# Make a size vector btwn 2 and 20 for node plotting size
+
+v.size <- BBmisc::normalize(pr$vector, range=c(2,20), method="range")
+plot(g, vertex.size=v.size, vertex.label=NA)
+```
+
+One of the simplest centrality scores is degree that we calculated previously and stored as the object d. We will plot this one also.
+```{r}
+v.size <- BBmisc::normalize(d, range=c(2,20), method="range")
+plot(g, vertex.size=v.size, vertex.label=NA)
+```
+
+Another very common centrality score is betweenness. The vertex and edge betweenness are (roughly) defined by the number of geodesics (shortest paths) going through a vertex or an edge.
+```{r}
+b <- betweenness(g)
+v.size <- BBmisc::normalize(b, range=c(2,20), method="range")
+plot(g, vertex.size=v.size, vertex.label=NA)
+```
+
+## Read taxonomic classification for network annotation
+
+Since these are data from small, microscopic organisms that were sequenced using shotgun sequencing, we rely on the classification of the sequences to know what kind of organisms are in the samples. In this case the bacterial viruses (bacteriophage), were classified by BLAST by searching for their closest sequence in the RefSeq database. The prokaryotic taxonomic classifications were determined using the SILVA database.
+
+```{r}
+phage_id_affiliation <- read.delim("phage_ids_with_affiliation.tsv")
+head(phage_id_affiliation)
+```
+
+```{r}
+bac_id_affi <- read.delim("prok_tax_from_silva.tsv", stringsAsFactors = FALSE)
+head(bac_id_affi)
+```
+
+## Add taxonomic annotation data to network
+
+```{r}
+## Extract out our vertex names
+genenet.nodes <- as.data.frame(vertex.attributes(g), stringsAsFactors=FALSE)
+head(genenet.nodes)
+```
+
+How may phage (i.e. ph_) entries do we have?
+```{r}
+length( grep("^ph_",genenet.nodes[,1]) )
+```
+
+Now lets merge() these with the annotation data
+```{r}
+# We dont need all annotation data so lets make a reduced table 'z' for merging
+z <- bac_id_affi[,c("Accession_ID", "Kingdom", "Phylum", "Class")]
+n <- merge(genenet.nodes, z, by.x="name", by.y="Accession_ID", all.x=TRUE)
+head(n)
+```
+
+```{r}
+# Check on the column names before deciding what to merge
+colnames(n)
+```
+
+```{r}
+colnames(phage_id_affiliation)
+```
+
+```{r}
+# Again we only need a subset of `phage_id_affiliation` for our purposes
+y <- phage_id_affiliation[, c("first_sheet.Phage_id_network", "phage_affiliation","Tax_order", "Tax_subfamily")]
+
+# Add the little phage annotation that we have
+x <- merge(x=n, y=y, by.x="name", by.y="first_sheet.Phage_id_network", all.x=TRUE)
+
+## Remove duplicates from multiple matches
+x <- x[!duplicated( (x$name) ),]
+head(x)
+```
+
+Save our merged annotation results back to genenet.nodes.
+```{r}
+genenet.nodes <- x
+```
+
+## Send network to Cytoscape using RCy3
+
+To begin we will delete any windows and networks that were already open in Cytoscape. This will clean the slate and help ensure we don’t use up all of our memory.
+
+```{r}
+deleteAllNetworks()
+```
+
+```{r}
+# Set the main nodes colname to the required "id" 
+colnames(genenet.nodes)[1] <- "id"
+```
+
+```{r}
+genenet.edges <- data.frame(igraph::as_edgelist(g))
+
+# Set the main edges colname to the required "source" and "target" 
+colnames(genenet.edges) <- c("source","target")
+
+# Add the weight from igraph to a new column...
+genenet.edges$Weight <- igraph::edge_attr(g)$weight
+
+# Send as a new network to Cytoscape
+createNetworkFromDataFrames(genenet.nodes,genenet.edges, 
+                            title="Tara_Oceans")
+```
