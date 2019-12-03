@@ -1,4 +1,4 @@
-Structural Bioinformatics
+Class11: Structural Bioinformatics I
 ================
 
 ### The PDB database for biomolecular structure data
