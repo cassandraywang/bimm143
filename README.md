@@ -15,9 +15,9 @@ This is my work from [BIMM143 at UC San Diego](https://bioboot.github.io/bimm143
 
 - Class10: Hands-on with Git
 
-- Class11: [Structural Bioinformatics](https://github.com/cassandraywang/bimm143/blob/master/Class11/Class11.md)
+- Class11: [Structural Bioinformatics I](https://github.com/cassandraywang/bimm143/blob/master/Class11/Class11.md)
 
-- Class12: [Drug discovery and design](https://github.com/cassandraywang/bimm143/blob/master/Class12/Class12.md)
+- Class12: [Structural Bioinformatics II: Drug discovery and design](https://github.com/cassandraywang/bimm143/blob/master/Class12/Class12.md)
 
 - Class13: Genome informatics and high-throughput sequencing
 
