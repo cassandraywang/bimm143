@@ -1,13 +1,15 @@
 ---
-title: "Class11: Structural Bioinformatics"
-output: github_document
+title: "Structural Bioinformatics"
+author: "Cassandra Wang"
+date: "11/5/2019"
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## The PDB database for biomolecular structure data
+### The PDB database for biomolecular structure data
 
 > Q1: Determine the percentage of PDB structures solved by X-Ray and Electron Microscopy. 
 
@@ -55,4 +57,3 @@ pdb
 ligand <- atom.select(pdb, "protein", value=TRUE)
 write.pdb(ligand, file="1hsg_ligand.pdb")
 ```
-
