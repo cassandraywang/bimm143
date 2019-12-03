@@ -1,4 +1,4 @@
-Class6 R Functions
+Class06 R Functions
 ================
 Cassandra Wang
 10/17/2019
